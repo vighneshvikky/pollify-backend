@@ -1,21 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-
-import { Chat, ChatDocument } from 'src/chat/schema/chat.schema';
 import {
   Message,
   MessageDocument,
   PopulatedMessage,
 } from 'src/message/schema/message.schema';
 import { IMessageRepository } from '../interface/IMessageRepository.interface';
-import { FileMetadata } from 'src/message/interface/message.types';
+import {
+  FileMetadata,
+  PollMetadata,
+} from 'src/message/interface/message.types';
+import { MessageType } from 'src/message/enum/message.enum';
 
 @Injectable()
 export class MessageRepository implements IMessageRepository {
   constructor(
-    @InjectModel(Message.name) private readonly messageModel: Model<MessageDocument>,
-    @InjectModel(Chat.name) private readonly chatModel: Model<ChatDocument>,
+    @InjectModel(Message.name)
+    private readonly messageModel: Model<MessageDocument>,
   ) {}
 
   async saveMessage(
@@ -24,24 +26,30 @@ export class MessageRepository implements IMessageRepository {
     content: string,
     type: string = 'text',
     fileMetadata?: FileMetadata,
+    pollMetadata?: PollMetadata,
   ): Promise<PopulatedMessage> {
-    if (type === 'image' && fileMetadata?.fileName) {
-      const baseUrl = process.env.BASE_URL;
+    if (type === MessageType.IMAGE && fileMetadata?.fileName) {
       fileMetadata.url = `/uploads/${encodeURIComponent(fileMetadata.fileName)}`;
     }
 
-    const message = new this.messageModel({
+    const messageData = new this.messageModel({
       chatId: new Types.ObjectId(chatId),
       senderId: new Types.ObjectId(senderId),
       content,
       type,
       fileMetadata,
-      isFormatted: type === 'text' && this.hasFormatting(content),
+      isFormatted: type === MessageType.TEXT && this.hasFormatting(content),
     });
+
+    if (type === MessageType.POLL) {
+      messageData.pollMetadata = pollMetadata;
+      messageData.content = '';
+    }
+
+    const message = new this.messageModel(messageData);
 
     const saved = await message.save();
 
-  
     const populated = await this.messageModel
       .findById(saved._id as Types.ObjectId)
       .populate('senderId', 'name email avatar')
@@ -53,7 +61,6 @@ export class MessageRepository implements IMessageRepository {
       throw new NotFoundException(`Message not found after saving`);
     }
 
-  
     return populated as unknown as PopulatedMessage;
   }
 
@@ -68,6 +75,26 @@ export class MessageRepository implements IMessageRepository {
       .exec();
 
     return messages as unknown as PopulatedMessage[];
+  }
+
+  async vote(
+    messageId: string,
+    optionIndex: number,
+  ): Promise<PopulatedMessage> {
+    const updated = await this.messageModel
+      .findByIdAndUpdate(
+        messageId,
+        { $inc: { [`pollMetadata.options.${optionIndex}.votes`]: 1 } },
+        { new: true },
+      )
+      .populate('senderId', 'name email avatar')
+      .populate('chatId', 'name isGroup')
+      .lean()
+      .exec();
+
+    if (!updated) throw new NotFoundException('Poll message not found');
+
+    return updated as unknown as PopulatedMessage;
   }
 
   async getMessageById(messageId: string): Promise<PopulatedMessage> {
@@ -85,17 +112,14 @@ export class MessageRepository implements IMessageRepository {
     return message as unknown as PopulatedMessage;
   }
 
-async getUserById(userId: Types.ObjectId) {
-  const message =  await this.messageModel
-    .find({ senderId: userId })
-    .populate('senderId', '_id name email avatar')
-    .exec();
-
-
+  async getUserById(userId: Types.ObjectId) {
+    const message = await this.messageModel
+      .find({ senderId: userId })
+      .populate('senderId', '_id name email avatar')
+      .exec();
 
     return message as unknown as PopulatedMessage;
-}
-
+  }
 
   private hasFormatting(content: string): boolean {
     const formatPatterns = /(\*\*|__|\*|_|~~|`)/;

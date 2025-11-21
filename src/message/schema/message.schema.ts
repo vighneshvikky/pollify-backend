@@ -1,10 +1,10 @@
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { MessageType } from '../enum/message.enum';
 
 @Schema({ timestamps: true })
 export class Message {
-  _id: Types.ObjectId; 
+  _id: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Chat', required: true })
   chatId: Types.ObjectId;
@@ -16,10 +16,10 @@ export class Message {
   content: string;
 
   @Prop({
-    default: 'text',
-    enum: ['text', 'image', 'file', 'video', 'audio', 'system'],
+    default: MessageType.TEXT,
+    enum: MessageType,
   })
-  type: string;
+  type: MessageType;
 
   @Prop({ type: Object })
   fileMetadata?: {
@@ -30,13 +30,30 @@ export class Message {
     url: string;
   };
 
+  @Prop({
+    type: {
+      question: String,
+      options: [
+        {
+          text: String,
+          votes: { type: Number, default: 0 },
+        },
+      ],
+      allowMultiple: { type: Boolean, default: false },
+    },
+  })
+  pollMetadata?: {
+    question: string;
+    options: { text: string; votes: number }[];
+    allowMultiple?: boolean;
+  };
+
   @Prop({ type: Boolean, default: false })
   isFormatted: boolean;
 
   @Prop({ default: Date.now })
   timestamp: Date;
 }
-
 
 export type MessageDocument = Message &
   Document & {
@@ -62,6 +79,11 @@ export interface PopulatedMessage {
     fileSize: number;
     mimeType: string;
     url: string;
+  };
+  PollMetadata?: {
+    question: string;
+    options: { text: string; votes: number }[];
+    allowMultiple?: boolean;
   };
   isFormatted: boolean;
   timestamp: Date;

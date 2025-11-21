@@ -1,12 +1,7 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
-import {
-  Message,
-  MessageDocument,
-  PopulatedMessage,
-} from '../schema/message.schema';
-import { Chat, ChatDocument } from 'src/chat/schema/chat.schema';
+import { Inject, Injectable } from '@nestjs/common';
+import { Types } from 'mongoose';
+import { PopulatedMessage } from '../schema/message.schema';
+
 import {
   IMessageRepository,
   IMESSAGEREPOSITORY,
@@ -16,6 +11,7 @@ import {
   FileMetadata,
   MessageResponse,
   MessageType,
+  PollMetadata,
 } from '../interface/message.types';
 
 function isPopulatedChat(
@@ -36,6 +32,7 @@ export class MessageService implements IMessageService {
     content: string,
     type: MessageType = 'text',
     fileMetadata?: FileMetadata,
+    pollMetadata?: PollMetadata
   ): Promise<MessageResponse> {
     const saved = await this._messageRepository.saveMessage(
       chatId,
@@ -43,6 +40,7 @@ export class MessageService implements IMessageService {
       content,
       type,
       fileMetadata,
+      pollMetadata
     );
 
     const populated = await this._messageRepository.getMessageById(
@@ -58,22 +56,27 @@ export class MessageService implements IMessageService {
     );
   }
 
+  async vote(messageId: string, optionIndex: number): Promise<MessageResponse> {
+    const message = await this._messageRepository.vote(messageId, optionIndex);
+    return this.mapToResponse(message);
+  }
+
   async getMessageById(messageId: string): Promise<MessageResponse> {
     const message = await this._messageRepository.getMessageById(messageId);
     return this.mapToResponse(message);
   }
 
-    async getUserById(userId: string){
+  async getUserById(userId: string) {
     const id = new Types.ObjectId(userId);
 
     const message = await this._messageRepository.getUserById(id);
-    return this.mapToResponse(message)
+    return this.mapToResponse(message);
   }
 
   private mapToResponse(message: PopulatedMessage): MessageResponse {
     const chatIdValue: string = isPopulatedChat(message.chatId)
       ? message.chatId._id.toString()
-      : (message.chatId as Types.ObjectId).toString(); 
+      : (message.chatId as Types.ObjectId).toString();
 
     return {
       _id: message._id.toString(),
@@ -95,10 +98,15 @@ export class MessageService implements IMessageService {
             url: message.fileMetadata.url,
           }
         : undefined,
+      pollMetadata: message.PollMetadata
+        ? {
+            question: message.PollMetadata.question,
+            options: message.PollMetadata.options,
+            allowMultiple: message.PollMetadata.allowMultiple,
+          }
+        : undefined,
       isFormatted: message.isFormatted,
       timestamp: message.timestamp,
     };
   }
-
-
 }

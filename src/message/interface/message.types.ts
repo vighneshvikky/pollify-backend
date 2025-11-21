@@ -1,11 +1,15 @@
-import { Types } from 'mongoose';
-
 export interface FileMetadata {
   originalName: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
   url: string;
+}
+
+export interface PollMetadata {
+  question: string;
+  options: { text: string; votes: number }[];
+  allowMultiple?: boolean;
 }
 
 export type MessageType = 'text' | 'image' | 'file' | 'video' | 'audio';
@@ -22,6 +26,7 @@ export interface MessageResponse {
   content: string;
   type: MessageType;
   fileMetadata?: FileMetadata;
+  pollMetadata?: PollMetadata;
   isFormatted: boolean;
   timestamp: Date;
 }

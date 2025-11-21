@@ -8,8 +8,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { ChatService } from './service/chat.service';
-import { MessageService } from 'src/message/service/message.service';
+
 import { FileMetadata, MessageType } from 'src/message/interface/message.types';
 import { Inject } from '@nestjs/common';
 import {
@@ -27,7 +26,9 @@ import { IChatGateway } from './interface/IChatgateway.interface';
     origin: process.env.FRONTEND_URL,
   },
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IChatGateway {
+export class ChatGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, IChatGateway
+{
   @WebSocketServer()
   server: Server;
 
@@ -39,8 +40,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
   ) {}
 
   handleConnection(client: Socket) {
-    
-
     const userId = client.handshake.query.userId as string;
     if (userId) {
       this.userSockets.set(userId, client.id);
@@ -49,8 +48,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
   }
 
   handleDisconnect(client: Socket) {
-   
-
     for (const [userId, socketId] of this.userSockets.entries()) {
       if (socketId === client.id) {
         this.userSockets.delete(userId);
@@ -70,13 +67,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
     console.log(`📥 Join room request:`, data);
 
     if (!chatId || !chatId.match(/^[0-9a-fA-F]{24}$/)) {
-   
       client.emit('error', { message: 'Invalid chat ID' });
       return;
     }
 
     client.join(chatId);
-  
 
     client.emit('roomJoined', { chatId, userId });
 
@@ -175,8 +170,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
     @MessageBody() data: { userId1: string; userId2: string },
     @ConnectedSocket() client: Socket,
   ) {
-    
-
     try {
       const chat = await this.chatService.createPrivateChat(
         data.userId1,
@@ -293,10 +286,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
         systemMessage._id!.toString(),
       );
 
-      // Broadcast system message to room
       this.server.to(data.chatId).emit('newMessage', populatedSystemMessage);
 
-      // Broadcast user added event
       this.server.to(data.chatId).emit('userAddedToGroup', {
         chatId: data.chatId,
         userId: data.userId,
@@ -305,7 +296,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
         userName: addedUserName,
       });
 
-      // Notify the added user
       const socketId = this.userSockets.get(data.userId);
       if (socketId) {
         this.server.to(socketId).emit('addedToGroup', updatedGroup);
@@ -364,10 +354,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
         systemMessage._id!.toString(),
       );
 
-      // Broadcast system message to all users in the room
       this.server.to(data.chatId).emit('newMessage', populatedSystemMessage);
 
-      // Broadcast user removed event
       this.server.to(data.chatId).emit('userRemovedFromGroup', {
         chatId: data.chatId,
         userId: data.userId,
@@ -376,7 +364,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
         userName: removedUserName,
       });
 
-      // Notify the removed user specifically
       const socketId = this.userSockets.get(data.userId);
       if (socketId) {
         this.server.to(socketId).emit('removedFromGroup', {
@@ -392,6 +379,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, IC
       console.error('❌ Error removing user from group:', error);
       client.emit('error', { message: 'Failed to remove user from group' });
     }
+  }
+
+  @SubscribeMessage('vote')
+  async handleVote(
+    client: Socket,
+    payload: { messageId: string; optionIndex: number },
+  ) {
+    const updatedMessage = await this.messageService.vote(
+      payload.messageId,
+      payload.optionIndex,
+    );
+
+    this.server.emit('pollUpdated', updatedMessage)
   }
 
   @SubscribeMessage('typing')

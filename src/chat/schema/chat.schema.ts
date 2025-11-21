@@ -4,7 +4,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Chat {
-  _id: Types.ObjectId;
+  _id: Types.ObjectId;  
 
   @Prop({ required: true })
   name: string;
