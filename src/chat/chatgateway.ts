@@ -45,7 +45,6 @@ export class ChatGateway
     const userId = client.handshake.query.userId as string;
     if (userId) {
       this.userSockets.set(userId, client.id);
-      console.log(`👤 User ${userId} mapped to socket ${client.id}`);
     }
   }
 
@@ -389,26 +388,57 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      console.log(`Creating poll:`, data);
-
-   
       const pollMessage = await this.messageService.createPoll(data);
 
-      client.emit('pollCreated', pollMessage);
-    } catch (err) {}
+      const populatedMessage = await this.messageService.getMessageById(
+        pollMessage._id.toString(),
+      );
+
+
+
+      this.server.to(data.chatId).emit('newMessage', populatedMessage);
+
+      await this.chatService.updateLastMessage(
+        data.chatId,
+        pollMessage._id.toString(),
+      );
+
+      client.emit('messageSent', {
+        messageId: pollMessage._id,
+        chatId: data.chatId,
+      });
+    } catch (error) {
+      console.error('❌ ERROR in handleSendMessage:', error);
+      client.emit('messageError', {
+        message: 'Failed to send message',
+        error: error.message,
+      });
+    }
   }
 
   @SubscribeMessage('vote')
   async handleVote(
-    client: Socket,
-    payload: { messageId: string; optionIndex: number },
+    @MessageBody()
+    payload: { messageId: string; optionIndex: number; userId: string },
+    @ConnectedSocket() client: Socket,
   ) {
-    const updatedMessage = await this.messageService.vote(
-      payload.messageId,
-      payload.optionIndex,
-    );
+    try {
+      const updatedMessage = await this.messageService.vote(
+        payload.messageId,
+        payload.optionIndex,
+        payload.userId,
+      );
 
-    this.server.emit('pollUpdated', updatedMessage);
+      const chatId = updatedMessage.chatId.toString();
+
+      this.server.to(chatId).emit('pollUpdated', updatedMessage);
+    } catch (error) {
+      console.error('❌ Error voting:', error);
+      client.emit('messageError', {
+        message: 'Failed to vote',
+        error: error.message,
+      });
+    }
   }
 
   @SubscribeMessage('typing')
@@ -422,8 +452,6 @@ export class ChatGateway
     },
     @ConnectedSocket() client: Socket,
   ) {
-    console.log(`⌨️ Typing event:`, data);
-
     client.to(data.chatId).emit('userTyping', data);
   }
 }

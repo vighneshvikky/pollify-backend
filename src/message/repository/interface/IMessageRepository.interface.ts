@@ -29,4 +29,11 @@ export interface IMessageRepository {
   getUserById(userId: Types.ObjectId): Promise<PopulatedMessage>;
 
   vote(messageId: string, optionIndex: number): Promise<PopulatedMessage>;
+
+
+    updatePollVote(
+  messageId: string,
+  pollMetadata: PollMetadata,
+  pollVotes: PollVote[],
+): Promise<PopulatedMessage> 
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { PopulatedMessage } from '../schema/message.schema';
 
@@ -57,10 +57,106 @@ export class MessageService implements IMessageService {
     );
   }
 
-  async vote(messageId: string, optionIndex: number): Promise<MessageResponse> {
-    const message = await this._messageRepository.vote(messageId, optionIndex);
-    return this.mapToResponse(message);
+  async vote(
+  messageId: string,
+  optionIndex: number,
+  userId: string,
+): Promise<MessageResponse> {
+  const message = await this._messageRepository.getMessageById(messageId);
+
+  if (!message || message.type !== MessageType.POLL) {
+    throw new NotFoundException('Invalid poll message');
   }
+
+  const { pollMetadata, pollVotes } = message;
+
+  if (!pollMetadata || !pollVotes) {
+    throw new NotFoundException('Poll metadata missing');
+  }
+
+  const allowMultiple = pollMetadata.allowMultiple;
+
+  let userVote = pollVotes.find(
+    (v) => v.userId.toString() === userId,
+  );
+
+  // ======================================
+  // CASE 1: MULTIPLE CHOICE POLL
+  // ======================================
+  if (allowMultiple) {
+    if (!userVote) {
+      pollVotes.push({
+        userId: new Types.ObjectId(userId),
+        optionIndices: [optionIndex],
+        votedAt: new Date(),
+      });
+      pollMetadata.options[optionIndex].votes++;
+    } else {
+      const alreadySelected = userVote.optionIndices.includes(optionIndex);
+
+      if (alreadySelected) {
+        // REMOVE selection
+        userVote.optionIndices = userVote.optionIndices.filter(
+          (i) => i !== optionIndex,
+        );
+        pollMetadata.options[optionIndex].votes = Math.max(
+          0,
+          pollMetadata.options[optionIndex].votes - 1,
+        );
+      } else {
+        // ADD selection
+        userVote.optionIndices.push(optionIndex);
+        pollMetadata.options[optionIndex].votes++;
+      }
+
+      userVote.votedAt = new Date();
+    }
+  }
+
+  // ======================================
+  // CASE 2: SINGLE CHOICE POLL
+  // ======================================
+  else {
+    if (!userVote) {
+      pollVotes.push({
+        userId: new Types.ObjectId(userId),
+        optionIndices: [optionIndex],
+        votedAt: new Date(),
+      });
+      pollMetadata.options[optionIndex].votes++;
+    } else {
+      const prevIndex = userVote.optionIndices[0];
+
+      if (prevIndex === optionIndex) {
+        // Same option → ignore
+        return this.mapToResponse(message);
+      }
+
+      // remove vote from previous
+      pollMetadata.options[prevIndex].votes = Math.max(
+        0,
+        pollMetadata.options[prevIndex].votes - 1,
+      );
+
+      // add vote to new
+      pollMetadata.options[optionIndex].votes++;
+
+      userVote.optionIndices = [optionIndex];
+      userVote.votedAt = new Date();
+    }
+  }
+
+  // ======================================
+  // SAVE CHANGES (Repository)
+  // ======================================
+  const updated = await this._messageRepository.updatePollVote(
+    messageId,
+    pollMetadata,
+    pollVotes,
+  );
+
+  return this.mapToResponse(updated);
+}
 
   async getMessageById(messageId: string): Promise<MessageResponse> {
     const message = await this._messageRepository.getMessageById(messageId);
@@ -70,9 +166,13 @@ export class MessageService implements IMessageService {
   async createPoll(data: CreatePollDto): Promise<MessageResponse> {
     const pollMetadata = {
       question: data.question,
-      options: data.options,
       allowMultiple: data.allowMultiple,
+      options: data.options.map((opt) => ({
+        text: opt.text, // ✔ take only the string
+        votes: 0, // ✔ initialize votes yourself
+      })),
     };
+
     const saved = await this._messageRepository.saveMessage(
       data.chatId,
       data.senderId,
@@ -121,7 +221,16 @@ export class MessageService implements IMessageService {
             url: message.fileMetadata.url,
           }
         : undefined,
-      poll: message.poll,
+      pollMetadata: message.pollMetadata
+        ? {
+            question: message.pollMetadata.question,
+            options: message.pollMetadata.options.map((opt) => ({
+              text: opt.text,
+              votes: opt.votes,
+            })),
+            allowMultiple: message.pollMetadata.allowMultiple,
+          }
+        : undefined,
       pollVotes: message.pollVotes
         ? message.pollVotes.map((vote) => ({
             userId: vote.userId.toString(),

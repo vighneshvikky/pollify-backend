@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { MessageType } from '../enum/message.enum';
-import { PollMetadata, PollMetadataResponse } from '../interface/message.types';
+import { PollMetadata } from '../interface/message.types';
 
 export interface PollVote {
   userId: Types.ObjectId;
@@ -40,14 +40,19 @@ export class Message {
   @Prop({
     type: {
       question: String,
-      options: [String],
+      options: [
+        {
+          text: String,
+          votes: {type: Number, default: 0}
+        }
+      ],
       allowMultiple: Boolean,
     },
     required: false,
   })
   pollMetadata?: {
     question: string;
-    options: string[];
+    options: {text: string; votes: number};
     allowMultiple: boolean;
   };
 
@@ -95,10 +100,10 @@ export interface PopulatedMessage {
     mimeType: string;
     url: string;
   };
-  poll?: PollMetadataResponse;
+  poll?: PollMetadata;
     pollMetadata?: {
     question: string;
-    options: string[];
+    options: { text: string; votes: number }[];
     allowMultiple: boolean;
   };
     pollVotes?: Array<{

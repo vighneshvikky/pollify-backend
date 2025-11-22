@@ -34,20 +34,19 @@ export class MessageRepository implements IMessageRepository {
       fileMetadata.url = `/uploads/${encodeURIComponent(fileMetadata.fileName)}`;
     }
 
-    const messageData = new this.messageModel({
-      chatId: new Types.ObjectId(chatId),
-      senderId: new Types.ObjectId(senderId),
-      content,
-      type,
-      fileMetadata,
-      pollMetadata,
-      pollVotes,
-      isFormatted: type === MessageType.TEXT && this.hasFormatting(content!),
-    });
+  const message = new this.messageModel({
+  chatId: new Types.ObjectId(chatId),
+  senderId: new Types.ObjectId(senderId),
+  content,
+  type,
+  fileMetadata,
+  pollMetadata,
+  pollVotes,
+  isFormatted: type === MessageType.TEXT && this.hasFormatting(content ?? ""),
+});
 
-    const message = new this.messageModel(messageData);
+const saved = await message.save();
 
-    const saved = await message.save();
 
     const populated = await this.messageModel
       .findById(saved._id as Types.ObjectId)
@@ -95,6 +94,28 @@ export class MessageRepository implements IMessageRepository {
 
     return updated as unknown as PopulatedMessage;
   }
+
+
+  async updatePollVote(
+  messageId: string,
+  pollMetadata: PollMetadata,
+  pollVotes: PollVote[],
+): Promise<PopulatedMessage> {
+  const updated = await this.messageModel
+    .findByIdAndUpdate(
+      messageId,
+      { pollMetadata, pollVotes },
+      { new: true },
+    )
+    .populate('senderId', 'name email avatar')
+    .populate('chatId', 'name isGroup')
+    .lean()
+    .exec();
+
+  if (!updated) throw new NotFoundException('Poll not found');
+
+  return updated as unknown as PopulatedMessage;
+}
 
   async getMessageById(messageId: string): Promise<PopulatedMessage> {
     const message = await this.messageModel

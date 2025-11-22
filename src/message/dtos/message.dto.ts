@@ -25,10 +25,9 @@ export class CreatePollDto {
   question: string;
 
   @IsArray()
-  @ArrayMinSize(2, { message: 'Poll must have at least 2 options' })
-  @ArrayMaxSize(10, { message: 'Poll cannot have more than 10 options' })
-  @IsString({ each: true })
-  options: string[];
+  @ArrayMinSize(2)
+  @ArrayMaxSize(10)
+  options: { text: string; votes: number }[];
 
   @IsBoolean()
   allowMultiple: boolean;
