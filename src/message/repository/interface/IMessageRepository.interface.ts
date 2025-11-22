@@ -1,7 +1,12 @@
 import { Types } from 'mongoose';
-import { FileMetadata, MessageType, PollMetadata } from 'src/message/interface/message.types';
+import { MessageType } from 'src/message/enum/message.enum';
+import {
+  FileMetadata,
+  PollMetadata,
+} from 'src/message/interface/message.types';
 import {
   MessageDocument,
+  PollVote,
   PopulatedMessage,
 } from 'src/message/schema/message.schema';
 
@@ -11,10 +16,11 @@ export interface IMessageRepository {
   saveMessage(
     chatId: string,
     senderId: string,
-    content: string,
+    content?: string,
     type?: MessageType,
     fileMetadata?: FileMetadata,
     pollMetadata?: PollMetadata,
+    pollVotes?: PollVote[],
   ): Promise<PopulatedMessage>;
 
   getMessages(chatId: string): Promise<PopulatedMessage[]>;

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { FileUploadService } from 'src/utils/file-upload.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { MessageType } from 'src/message/interface/message.types';
+
 import {
   IMessageService,
   IMESSAGESERVICE,
@@ -26,6 +26,7 @@ import {
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { IChatGateway, ICHATGATEWAY } from '../interface/IChatgateway.interface';
+import { MessageType } from 'src/message/enum/message.enum';
 
 export class CreatePrivateChatDto {
   participantId: string;
@@ -122,10 +123,10 @@ export class ChatsController {
       throw new BadRequestException('No file uploaded');
     }
 
-    let messageType: MessageType = 'file';
-    if (file.mimetype.startsWith('image/')) messageType = 'image';
-    else if (file.mimetype.startsWith('video/')) messageType = 'video';
-    else if (file.mimetype.startsWith('audio/')) messageType = 'audio';
+    let messageType:  MessageType = MessageType.FILE;
+    if (file.mimetype.startsWith('image/')) messageType = MessageType.IMAGE;
+    else if (file.mimetype.startsWith('video/')) messageType = MessageType.VIDEO;
+    else if (file.mimetype.startsWith('audio/')) messageType = MessageType.AUDIO;
 
     const fileMetadata = await this.fileUploadService.uploadFile(file);
 

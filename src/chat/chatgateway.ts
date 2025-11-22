@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import { FileMetadata, MessageType } from 'src/message/interface/message.types';
+import { FileMetadata } from 'src/message/interface/message.types';
 import { Inject } from '@nestjs/common';
 import {
   IMessageService,
@@ -20,6 +20,8 @@ import {
   ICHATSERVICE,
 } from './service/interface/IChatService.interface';
 import { IChatGateway } from './interface/IChatgateway.interface';
+import { CreatePollDto } from 'src/message/dtos/message.dto';
+import { MessageType } from 'src/message/enum/message.enum';
 
 @WebSocketGateway({
   cors: {
@@ -381,6 +383,21 @@ export class ChatGateway
     }
   }
 
+  @SubscribeMessage('createPoll')
+  async handleCreatePoll(
+    @MessageBody() data: CreatePollDto,
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      console.log(`Creating poll:`, data);
+
+   
+      const pollMessage = await this.messageService.createPoll(data);
+
+      client.emit('pollCreated', pollMessage);
+    } catch (err) {}
+  }
+
   @SubscribeMessage('vote')
   async handleVote(
     client: Socket,
@@ -391,7 +408,7 @@ export class ChatGateway
       payload.optionIndex,
     );
 
-    this.server.emit('pollUpdated', updatedMessage)
+    this.server.emit('pollUpdated', updatedMessage);
   }
 
   @SubscribeMessage('typing')

@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { FileMetadata, MessageType } from 'src/message/interface/message.types';
+import { FileMetadata } from 'src/message/interface/message.types';
 
 export interface IChatGateway {
   server: Server;

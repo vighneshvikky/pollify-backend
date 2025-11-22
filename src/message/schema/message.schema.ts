@@ -1,6 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { MessageType } from '../enum/message.enum';
+import { PollMetadata, PollMetadataResponse } from '../interface/message.types';
+
+export interface PollVote {
+  userId: Types.ObjectId;
+  optionIndices: number[];
+  votedAt: Date;
+}
 
 @Schema({ timestamps: true })
 export class Message {
@@ -12,7 +19,7 @@ export class Message {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   senderId: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   content: string;
 
   @Prop({
@@ -33,20 +40,28 @@ export class Message {
   @Prop({
     type: {
       question: String,
-      options: [
-        {
-          text: String,
-          votes: { type: Number, default: 0 },
-        },
-      ],
-      allowMultiple: { type: Boolean, default: false },
+      options: [String],
+      allowMultiple: Boolean,
     },
+    required: false,
   })
   pollMetadata?: {
     question: string;
-    options: { text: string; votes: number }[];
-    allowMultiple?: boolean;
+    options: string[];
+    allowMultiple: boolean;
   };
+
+  @Prop({
+    type: [
+      {
+        userId: { type: Types.ObjectId, ref: "User" },
+        optionIndices: [Number],
+        votedAt: Date,
+      },
+    ],
+    default: [],
+  })
+  pollVotes?: PollVote[];
 
   @Prop({ type: Boolean, default: false })
   isFormatted: boolean;
@@ -72,7 +87,7 @@ export interface PopulatedMessage {
     avatar?: string;
   };
   content: string;
-  type: string;
+  type: MessageType | string;
   fileMetadata?: {
     originalName: string;
     fileName: string;
@@ -80,11 +95,17 @@ export interface PopulatedMessage {
     mimeType: string;
     url: string;
   };
-  PollMetadata?: {
+  poll?: PollMetadataResponse;
+    pollMetadata?: {
     question: string;
-    options: { text: string; votes: number }[];
-    allowMultiple?: boolean;
+    options: string[];
+    allowMultiple: boolean;
   };
+    pollVotes?: Array<{
+    userId: Types.ObjectId;
+    optionIndices: number[];
+    votedAt: Date;
+  }>;
   isFormatted: boolean;
   timestamp: Date;
 }

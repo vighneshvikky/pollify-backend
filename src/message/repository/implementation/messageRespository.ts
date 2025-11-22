@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import {
   Message,
   MessageDocument,
+  PollVote,
   PopulatedMessage,
 } from 'src/message/schema/message.schema';
 import { IMessageRepository } from '../interface/IMessageRepository.interface';
@@ -23,10 +24,11 @@ export class MessageRepository implements IMessageRepository {
   async saveMessage(
     chatId: string,
     senderId: string,
-    content: string,
+    content?: string,
     type: string = 'text',
     fileMetadata?: FileMetadata,
     pollMetadata?: PollMetadata,
+    pollVotes?: PollVote[],
   ): Promise<PopulatedMessage> {
     if (type === MessageType.IMAGE && fileMetadata?.fileName) {
       fileMetadata.url = `/uploads/${encodeURIComponent(fileMetadata.fileName)}`;
@@ -38,13 +40,10 @@ export class MessageRepository implements IMessageRepository {
       content,
       type,
       fileMetadata,
-      isFormatted: type === MessageType.TEXT && this.hasFormatting(content),
+      pollMetadata,
+      pollVotes,
+      isFormatted: type === MessageType.TEXT && this.hasFormatting(content!),
     });
-
-    if (type === MessageType.POLL) {
-      messageData.pollMetadata = pollMetadata;
-      messageData.content = '';
-    }
 
     const message = new this.messageModel(messageData);
 

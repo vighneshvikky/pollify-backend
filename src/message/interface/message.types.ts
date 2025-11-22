@@ -1,3 +1,7 @@
+
+import { MessageType } from "../enum/message.enum";
+import { PollVote } from "../schema/message.schema";
+
 export interface FileMetadata {
   originalName: string;
   fileName: string;
@@ -6,13 +10,18 @@ export interface FileMetadata {
   url: string;
 }
 
-export interface PollMetadata {
-  question: string;
-  options: { text: string; votes: number }[];
-  allowMultiple?: boolean;
+export interface PollOption {
+  text: string;
+  votes: string[];  
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'video' | 'audio';
+export interface PollMetadata {
+    question: string;
+    options: string[];
+    allowMultiple: boolean;
+}
+
+// export type MessageType = 'text' | 'image' | 'file' | 'video' | 'audio';
 
 export interface MessageResponse {
   _id: string;
@@ -26,10 +35,24 @@ export interface MessageResponse {
   content: string;
   type: MessageType;
   fileMetadata?: FileMetadata;
-  pollMetadata?: PollMetadata;
+  poll?:  PollMetadataResponse;
+    pollVotes?: {
+    userId: string;
+    optionIndices: number[];
+    votedAt: Date;
+  }[];
   isFormatted: boolean;
   timestamp: Date;
 }
+
+export interface PollMetadataResponse {
+  question: string;
+  options: {
+    text: string;
+    votes: number;
+  }[];
+}
+
 
 export interface IMessageService {
   saveMessage(

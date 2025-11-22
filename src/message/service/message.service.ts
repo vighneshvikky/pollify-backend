@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { PopulatedMessage } from '../schema/message.schema';
 
@@ -10,9 +10,10 @@ import { IMessageService } from './interface/IMessage-interface';
 import {
   FileMetadata,
   MessageResponse,
-  MessageType,
   PollMetadata,
 } from '../interface/message.types';
+import { CreatePollDto } from '../dtos/message.dto';
+import { MessageType } from '../enum/message.enum';
 
 function isPopulatedChat(
   chatId: Types.ObjectId | { _id: Types.ObjectId },
@@ -30,9 +31,9 @@ export class MessageService implements IMessageService {
     chatId: string,
     senderId: string,
     content: string,
-    type: MessageType = 'text',
+    type: MessageType.TEXT,
     fileMetadata?: FileMetadata,
-    pollMetadata?: PollMetadata
+    pollMetadata?: PollMetadata,
   ): Promise<MessageResponse> {
     const saved = await this._messageRepository.saveMessage(
       chatId,
@@ -40,7 +41,7 @@ export class MessageService implements IMessageService {
       content,
       type,
       fileMetadata,
-      pollMetadata
+      pollMetadata,
     );
 
     const populated = await this._messageRepository.getMessageById(
@@ -64,6 +65,28 @@ export class MessageService implements IMessageService {
   async getMessageById(messageId: string): Promise<MessageResponse> {
     const message = await this._messageRepository.getMessageById(messageId);
     return this.mapToResponse(message);
+  }
+
+  async createPoll(data: CreatePollDto): Promise<MessageResponse> {
+    const pollMetadata = {
+      question: data.question,
+      options: data.options,
+      allowMultiple: data.allowMultiple,
+    };
+    const saved = await this._messageRepository.saveMessage(
+      data.chatId,
+      data.senderId,
+      undefined,
+      MessageType.POLL,
+      undefined,
+      pollMetadata,
+      [],
+    );
+
+    const populated = await this._messageRepository.getMessageById(
+      saved._id.toString(),
+    );
+    return this.mapToResponse(populated);
   }
 
   async getUserById(userId: string) {
@@ -98,12 +121,13 @@ export class MessageService implements IMessageService {
             url: message.fileMetadata.url,
           }
         : undefined,
-      pollMetadata: message.PollMetadata
-        ? {
-            question: message.PollMetadata.question,
-            options: message.PollMetadata.options,
-            allowMultiple: message.PollMetadata.allowMultiple,
-          }
+      poll: message.poll,
+      pollVotes: message.pollVotes
+        ? message.pollVotes.map((vote) => ({
+            userId: vote.userId.toString(),
+            optionIndices: vote.optionIndices,
+            votedAt: vote.votedAt,
+          }))
         : undefined,
       isFormatted: message.isFormatted,
       timestamp: message.timestamp,
