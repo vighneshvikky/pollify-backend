@@ -6,7 +6,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { Chat } from '../schema/chat.schema';
-import { User } from 'src/user/schemas/user.schema';
 import { IChatRepository } from './interface/IChatRepository.interface';
 import { PopulatedChat } from '../types/populated-chat.type';
 
@@ -14,7 +13,6 @@ import { PopulatedChat } from '../types/populated-chat.type';
 export class ChatRepository implements IChatRepository {
   constructor(
     @InjectModel(Chat.name) private readonly chatModel: Model<Chat>,
-    @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
   async createPrivateChat(
@@ -41,11 +39,8 @@ export class ChatRepository implements IChatRepository {
 
     if (existingChat) return existingChat;
 
-    const participant = await this.userModel.findById(participantObjectId);
-    if (!participant) throw new NotFoundException('Participant not found');
-
     const chat = new this.chatModel({
-      name: participant.name,
+      name: `Chat_${participantId}`,
       members: [userObjectId, participantObjectId],
       isGroup: false,
       lastMessage: null,
@@ -57,8 +52,6 @@ export class ChatRepository implements IChatRepository {
       .populate('members', 'name email avatar')
       .exec();
   }
-
-
 
   async createGroupChat(name: string, members: string[], createdBy: string) {
     const chat = new this.chatModel({
@@ -75,7 +68,6 @@ export class ChatRepository implements IChatRepository {
       .exec();
   }
 
-
   async addUserToGroup(chatId: string, userId: string) {
     const chat = await this.chatModel
       .findByIdAndUpdate(
@@ -89,8 +81,6 @@ export class ChatRepository implements IChatRepository {
 
     return chat;
   }
-
-
 
   async removeUserFromGroup(chatId: string, userId: string) {
     const chat = await this.chatModel
@@ -181,15 +171,15 @@ export class ChatRepository implements IChatRepository {
   }
 
   async updateLastMessage(chatId: string, messageId: string): Promise<void> {
-    await this.chatModel.findByIdAndUpdate(chatId, {
-      lastMessage: new Types.ObjectId(messageId),
-    }).exec()
+    await this.chatModel
+      .findByIdAndUpdate(chatId, {
+        lastMessage: new Types.ObjectId(messageId),
+      })
+      .exec();
   }
 
   async delete(chatId: string): Promise<void> {
     const result = await this.chatModel.findByIdAndDelete(chatId);
     if (!result) throw new NotFoundException('Chat not found');
   }
-
-  
 }
