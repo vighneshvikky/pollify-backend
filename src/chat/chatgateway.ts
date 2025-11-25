@@ -136,7 +136,7 @@ export class ChatGateway
         data.fileMetadata,
       );
 
-      console.log('✅ Message saved with ID:', message._id);
+    
 
       const populatedMessage = await this.messageService.getMessageById(
         message._id!.toString(),
@@ -146,7 +146,6 @@ export class ChatGateway
 
       this.server.to(data.chatId).emit('newMessage', populatedMessage);
 
-      console.log('✅ Message broadcast complete');
 
       await this.chatService.updateLastMessage(
         data.chatId,
@@ -393,8 +392,6 @@ export class ChatGateway
       const populatedMessage = await this.messageService.getMessageById(
         pollMessage._id.toString(),
       );
-
-
 
       this.server.to(data.chatId).emit('newMessage', populatedMessage);
 
